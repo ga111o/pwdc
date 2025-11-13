@@ -1,0 +1,41 @@
+#!/bin/bash
+# pwdc - Copy current directory to clipboard
+
+# Get current directory
+current_dir=$(pwd)
+
+# Handle arguments
+if [ -n "$1" ]; then
+    if [ "$1" = "." ]; then
+        # Only "." → copy directory name only
+        current_dir=$(basename "$current_dir")
+    else
+        # Path argument → append to current directory
+        # Remove leading "./" if present
+        path_arg="${1#./}"
+        current_dir="$current_dir/$path_arg"
+    fi
+fi
+
+# Detect environment and copy to appropriate clipboard
+if grep -qi microsoft /proc/version 2>/dev/null || [ -n "$WSL_DISTRO_NAME" ]; then
+    # WSL2 environment
+    echo -n "$current_dir" | clip.exe
+    echo "📋 Copied to clipboard (WSL2): $current_dir"
+elif [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy &> /dev/null; then
+    # Wayland environment
+    echo -n "$current_dir" | wl-copy
+    echo "📋 Copied to clipboard (Wayland): $current_dir"
+elif [ -n "$DISPLAY" ] && command -v xclip &> /dev/null; then
+    # X11 with xclip
+    echo -n "$current_dir" | xclip -selection clipboard
+    echo "📋 Copied to clipboard (X11): $current_dir"
+elif [ -n "$DISPLAY" ] && command -v xsel &> /dev/null; then
+    # X11 with xsel
+    echo -n "$current_dir" | xsel --clipboard
+    echo "📋 Copied to clipboard (X11): $current_dir"
+else
+    echo "❌ Error: No clipboard utility found for your environment."
+    echo "Please run 'make install' to set up the appropriate clipboard utility."
+    exit 1
+fi
