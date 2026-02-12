@@ -8,114 +8,53 @@ echo "    pwdc Installation Script"
 echo "==================================="
 echo ""
 
-# Detect environment
-IS_WSL=false
-IS_WAYLAND=false
-IS_X11=false
+# Detect possible environments
+HAS_WSL=false
+HAS_WAYLAND=false
+HAS_X11=false
 
 if grep -qi microsoft /proc/version 2>/dev/null || [ -n "$WSL_DISTRO_NAME" ]; then
-    IS_WSL=true
-    echo "✓ Detected: WSL2 environment"
-elif [ -n "$WAYLAND_DISPLAY" ]; then
-    IS_WAYLAND=true
-    echo "✓ Detected: Wayland environment"
-elif [ -n "$DISPLAY" ]; then
-    IS_X11=true
-    echo "✓ Detected: X11 environment"
-else
-    echo "⚠ Could not auto-detect display environment"
+    HAS_WSL=true
+fi
+if [ -n "$WAYLAND_DISPLAY" ] || command -v wl-copy &> /dev/null; then
+    HAS_WAYLAND=true
+fi
+if [ -n "$DISPLAY" ] || command -v xclip &> /dev/null; then
+    HAS_X11=true
 fi
 
-echo ""
-echo "Please confirm your environment:"
-echo "1) WSL2 (Windows Subsystem for Linux)"
-echo "2) Wayland"
-echo "3) X11"
-echo "4) Auto-detect (recommended)"
-echo ""
-read -p "Choose [1-4] (default: 4): " choice
-choice=${choice:-4}
-
-case $choice in
-    1)
-        IS_WSL=true
-        IS_WAYLAND=false
-        IS_X11=false
-        echo "Selected: WSL2"
-        ;;
-    2)
-        IS_WSL=false
-        IS_WAYLAND=true
-        IS_X11=false
-        echo "Selected: Wayland"
-        ;;
-    3)
-        IS_WSL=false
-        IS_WAYLAND=false
-        IS_X11=true
-        echo "Selected: X11"
-        ;;
-    4)
-        echo "Using auto-detected environment"
-        ;;
-    *)
-        echo "Invalid choice. Using auto-detect."
-        ;;
-esac
-
-echo ""
-echo "==================================="
-echo "   Installing Dependencies"
-echo "==================================="
+echo "The pwdc script now automatically detects your environment (Local, SSH, WSL, etc.)"
+echo "Installing necessary dependencies for a universal experience..."
 echo ""
 
-# Install appropriate clipboard utility
-if [ "$IS_WSL" = true ]; then
-    echo "✓ WSL2 uses clip.exe (already available in Windows)"
-    if ! command -v clip.exe &> /dev/null; then
-        echo "⚠ Warning: clip.exe not found. Make sure Windows is accessible."
-    fi
-elif [ "$IS_WAYLAND" = true ]; then
-    echo "Installing wl-clipboard for Wayland..."
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update
-        sudo apt-get install -y wl-clipboard
-    elif command -v dnf &> /dev/null; then
-        sudo dnf install -y wl-clipboard
-    elif command -v pacman &> /dev/null; then
-        sudo pacman -S --noconfirm wl-clipboard
-    elif command -v zypper &> /dev/null; then
-        sudo zypper install -y wl-clipboard
-    else
-        echo "⚠ Warning: Could not detect package manager. Please install wl-clipboard manually."
-    fi
-elif [ "$IS_X11" = true ]; then
-    echo "Installing clipboard utility for X11..."
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update
-        sudo apt-get install -y xclip
-    elif command -v dnf &> /dev/null; then
-        sudo dnf install -y xclip
-    elif command -v pacman &> /dev/null; then
-        sudo pacman -S --noconfirm xclip
-    elif command -v zypper &> /dev/null; then
-        sudo zypper install -y xclip
-    else
-        echo "⚠ Warning: Could not detect package manager. Please install xclip manually."
-    fi
-else
-    echo "⚠ Could not determine environment. Attempting to install multiple clipboard utilities..."
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update
-        sudo apt-get install -y xclip wl-clipboard
-    elif command -v dnf &> /dev/null; then
-        sudo dnf install -y xclip wl-clipboard
-    elif command -v pacman &> /dev/null; then
-        sudo pacman -S --noconfirm xclip wl-clipboard
-    elif command -v zypper &> /dev/null; then
-        sudo zypper install -y xclip wl-clipboard
-    fi
+# Install appropriate clipboard utilities
+if command -v apt-get &> /dev/null; then
+    echo "Using apt-get to install dependencies..."
+    DEPS="coreutils"
+    [ "$HAS_WAYLAND" = true ] && DEPS="$DEPS wl-clipboard"
+    [ "$HAS_X11" = true ] && DEPS="$DEPS xclip"
+    sudo apt-get update
+    sudo apt-get install -y $DEPS
+elif command -v dnf &> /dev/null; then
+    echo "Using dnf to install dependencies..."
+    DEPS="coreutils"
+    [ "$HAS_WAYLAND" = true ] && DEPS="$DEPS wl-clipboard"
+    [ "$HAS_X11" = true ] && DEPS="$DEPS xclip"
+    sudo dnf install -y $DEPS
+elif command -v pacman &> /dev/null; then
+    echo "Using pacman to install dependencies..."
+    DEPS="coreutils"
+    [ "$HAS_WAYLAND" = true ] && DEPS="$DEPS wl-clipboard"
+    [ "$HAS_X11" = true ] && DEPS="$DEPS xclip"
+    sudo pacman -S --noconfirm $DEPS
+elif command -v zypper &> /dev/null; then
+    echo "Using zypper to install dependencies..."
+    DEPS="coreutils"
+    [ "$HAS_WAYLAND" = true ] && DEPS="$DEPS wl-clipboard"
+    [ "$HAS_X11" = true ] && DEPS="$DEPS xclip"
+    sudo zypper install -y $DEPS
 fi
+
 
 echo ""
 echo "==================================="
@@ -147,7 +86,7 @@ fi
 # Check if install directory is in PATH
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo ""
-    echo "⚠ Warning: $INSTALL_DIR is not in your PATH"
+    echo "Warning: $INSTALL_DIR is not in your PATH"
     echo ""
     echo "Add the following line to your $RC_NAME:"
     echo ""
@@ -158,7 +97,7 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         echo "" >> "$RC_FILE"
         echo "# Added by pwdc installer" >> "$RC_FILE"
         echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC_FILE"
-        echo "✓ Added to $RC_NAME"
+        echo "Added to $RC_NAME"
         echo "  Run 'source $RC_NAME' or restart your terminal to apply changes."
     fi
 fi
@@ -168,7 +107,7 @@ echo "==================================="
 echo "   Installation Complete!"
 echo "==================================="
 echo ""
-echo "✓ pwdc has been installed successfully!"
+echo "pwdc has been installed successfully!"
 echo ""
 echo "Usage:"
 echo "  pwdc           - Copy the full current directory path to clipboard"

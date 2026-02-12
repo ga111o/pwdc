@@ -16,7 +16,7 @@ install:
 uninstall:
 	@echo "Uninstalling pwdc..."
 	@rm -f $(BINDIR)/pwdc
-	@echo "✓ pwdc has been uninstalled from $(BINDIR)"
+	@echo "pwdc has been uninstalled from $(BINDIR)"
 
 clean:
 	@echo "Nothing to clean (no build artifacts)"
